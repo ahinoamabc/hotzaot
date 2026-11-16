@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>הוצאות</title>
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="הוצאות">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app">
+
+    <!-- רישום הוצאה -->
+    <section id="view-add" class="view">
+      <div class="chips-row">
+        <label class="chip" id="date-chip">
+          <span id="date-label">היום</span>
+          <input type="date" id="date-input" aria-label="תאריך">
+        </label>
+        <button class="chip" id="note-chip" type="button">הערה</button>
+        <button class="chip toggle" id="shared-chip" type="button" aria-pressed="false">משותף</button>
+      </div>
+      <input id="note-input" class="note-input hidden" type="text" placeholder="הערה (לא חובה)" maxlength="120">
+
+      <div class="amount-box">
+        <div class="amount" id="amount-display"><span class="amount-num">0</span> <span class="amount-cur">₪</span></div>
+        <div class="share-row hidden" id="share-row">
+          <span id="share-label"></span>
+          <span class="split-chips">
+            <button type="button" class="mini" data-split="3">÷3</button>
+            <button type="button" class="mini" data-split="2">÷2</button>
+            <button type="button" class="mini" data-split="custom">סכום אחר</button>
+          </span>
+        </div>
+      </div>
+
+      <div class="cat-grid" id="cat-grid"></div>
+      <div class="pay-row" id="pay-row"></div>
+
+      <div class="numpad" id="numpad">
+        <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+        <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+        <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+        <button type="button" data-k=".">.</button><button type="button" data-k="0">0</button><button type="button" data-k="del" aria-label="מחיקה">⌫</button>
+      </div>
+      <button type="button" class="save-btn" id="save-btn" disabled>שמירה</button>
+    </section>
+
+    <!-- מבט על החודש -->
+    <section id="view-month" class="view hidden">
+      <div class="month-nav">
+        <button type="button" class="icon-btn" id="month-prev" aria-label="חודש קודם">›</button>
+        <h1 id="month-title"></h1>
+        <button type="button" class="icon-btn" id="month-next" aria-label="חודש הבא">‹</button>
+      </div>
+      <div class="card total-card">
+        <div class="muted">הוצאתי החודש</div>
+        <div class="big" id="month-total"></div>
+      </div>
+      <div class="card">
+        <ul class="cat-list" id="cat-list"></ul>
+      </div>
+      <div class="card row-card">
+        <div>
+          <div class="muted">יתרה פתוחה מול השותפות</div>
+          <div class="mid" id="partner-balance"></div>
+        </div>
+        <button type="button" class="secondary" id="settle-btn">התחשבנו</button>
+      </div>
+      <div class="card">
+        <div class="muted" id="bank-asof"></div>
+        <div class="bank-grid">
+          <span>עו"ש</span><span id="bank-balance"></span>
+          <span>חיוב אשראי צפוי</span><span id="bank-pending"></span>
+          <strong>זמין בפועל</strong><strong id="bank-available"></strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- הגדרות -->
+    <section id="view-settings" class="view hidden">
+      <h1>הגדרות</h1>
+      <div class="card">
+        <h2>סנכרון</h2>
+        <p id="sync-detail" class="muted"></p>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="sync-btn">סנכרון עכשיו</button>
+          <button type="button" class="secondary hidden" id="logout-btn">התנתקות</button>
+        </div>
+      </div>
+      <form class="card" id="bank-form">
+        <h2>יתרה בעו"ש</h2>
+        <label class="field"><span>עו"ש</span><input type="text" inputmode="decimal" id="set-balance"></label>
+        <label class="field"><span>חיוב אשראי צפוי</span><input type="text" inputmode="decimal" id="set-pending"></label>
+        <button type="submit" class="secondary">שמירה</button>
+      </form>
+      <form class="card" id="fixed-form">
+        <h2>הוצאות קבועות</h2>
+        <p class="muted">שינוי כאן חל מהחודש הבא. חודשים קודמים לא משתנים.</p>
+        <div id="fixed-list"></div>
+        <button type="submit" class="secondary">שמירה</button>
+      </form>
+    </section>
+
+    <!-- התחברות -->
+    <section id="view-login" class="view hidden">
+      <h1>כניסה</h1>
+      <form class="card" id="login-form">
+        <label class="field"><span>מייל</span><input type="email" id="login-email" autocomplete="username" required></label>
+        <label class="field"><span>סיסמה</span><input type="password" id="login-password" autocomplete="current-password" required></label>
+        <p class="error hidden" id="login-error"></p>
+        <button type="submit" class="save-btn">כניסה</button>
+      </form>
+      <p class="muted center">אפשר גם לרשום בלי להתחבר. ההוצאות יישמרו בטלפון ויעלו לענן אחרי הכניסה.</p>
+      <button type="button" class="secondary block" id="login-skip">להמשיך בלי כניסה</button>
+    </section>
+
+  </main>
+
+  <nav class="tabbar" id="tabbar">
+    <button type="button" data-view="add" class="active">רישום</button>
+    <button type="button" data-view="month">החודש</button>
+    <button type="button" data-view="settings">הגדרות <span class="dot hidden" id="sync-dot"></span></button>
+  </nav>
+
+  <div class="toast hidden" id="toast" role="status"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
