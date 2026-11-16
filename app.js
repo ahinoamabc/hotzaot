@@ -26,7 +26,8 @@ const PAYMENTS = [
   { id: 'lochem',  name: 'לוחם' },
   { id: 'bit',     name: 'ביט' },
 ];
-const PAY_NAME = { ...Object.fromEntries(PAYMENTS.map(p => [p.id, p.name])), fixed: 'קבוע' };
+// check ו-fixed לא מופיעים ככפתורים: הם רק להוצאות קבועות (למשל השכירות בצ'קים)
+const PAY_NAME = { ...Object.fromEntries(PAYMENTS.map(p => [p.id, p.name])), fixed: 'קבוע', check: "צ'ק" };
 
 const FIRST_MONTH = '2026-11';   // החודש הראשון באפליקציה
 const MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -35,7 +36,7 @@ const MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יו
 // היתרה, ההוצאות הקבועות והתקציבים נשמרים בטבלת settings ב-Supabase.
 const DEFAULT_SETTINGS = {
   bank: { balance: 0, pending: 0, asOf: null },
-  fixed: [],     // [{ key, name, amount, category }]
+  fixed: [],     // [{ key, name, amount, category, payment? }]
   budgets: {},   // { categoryId: amount }
 };
 
@@ -127,7 +128,7 @@ function ensureFixed() {
     const id = `fixed-${ym}-${f.key}`;
     if (db.expenses[id]) continue;
     putExpense({ id, date: `${ym}-01`, amount: f.amount, my_share: f.amount, category: f.category,
-      payment: 'fixed', shared: false, note: f.name, source: 'fixed', deleted: false });
+      payment: f.payment || 'fixed', shared: false, note: f.name, source: 'fixed', deleted: false });
     added = true;
   }
   if (added) persist();
