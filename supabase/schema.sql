@@ -18,6 +18,23 @@ create table if not exists expenses (
   primary key (user_id, id)
 );
 
+-- הכנסות (שייכות לחודש שבו הכסף נכנס בפועל)
+create table if not exists incomes (
+  user_id    uuid not null default auth.uid() references auth.users on delete cascade,
+  id         text not null,
+  date       date not null,
+  amount     numeric(10,2) not null check (amount >= 0),
+  source     text not null,          -- unemployment | elections | salary | other
+  note       text,
+  deleted    boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+alter table incomes enable row level security;
+drop policy if exists own_rows on incomes;
+create policy own_rows on incomes for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+
 -- התחשבנויות עם השותפות (למשל ביט שהתקבל). לא הכנסה ולא הוצאה
 create table if not exists settlements (
   user_id    uuid not null default auth.uid() references auth.users on delete cascade,

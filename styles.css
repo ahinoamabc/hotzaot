@@ -149,6 +149,21 @@ h2 { font-size: 17px; margin: 0 0 8px; }
 .items .i-amt { font-variant-numeric: tabular-nums; }
 .del-btn, .edit-btn { width: 32px; height: 32px; border-radius: 999px; color: var(--muted); font-size: 16px; }
 .edit-btn { color: var(--accent); }
+.kind-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; background: var(--surface-2); border-radius: 12px; }
+.kind-toggle button { height: 34px; border-radius: 9px; font-size: 15px; color: var(--muted); }
+.kind-toggle button.active { background: var(--surface); color: var(--text); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.src-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.src-btn {
+  height: 64px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; font-size: 16px;
+}
+.src-btn .ic { font-size: 22px; }
+.src-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+.net-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.net-num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.net-num.pos { color: var(--accent); }
+.net-num.neg { color: var(--danger); }
+.items.flat { padding: 0; margin: 0; }
 .edit-bar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 14px; border-radius: 12px;

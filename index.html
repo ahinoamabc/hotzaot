@@ -23,6 +23,10 @@
         <span>עריכת הוצאה</span>
         <button type="button" id="edit-cancel">ביטול</button>
       </div>
+      <div class="kind-toggle" id="kind-toggle" role="tablist">
+        <button type="button" data-kind="expense" class="active">הוצאה</button>
+        <button type="button" data-kind="income">הכנסה</button>
+      </div>
       <div class="chips-row">
         <label class="chip" id="date-chip">
           <span id="date-label">היום</span>
@@ -47,6 +51,7 @@
 
       <div class="cat-grid" id="cat-grid"></div>
       <div class="pay-row" id="pay-row"></div>
+      <div class="src-grid hidden" id="src-grid"></div>
 
       <div class="numpad" id="numpad">
         <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
@@ -67,6 +72,14 @@
       <div class="card total-card">
         <div class="muted">הוצאתי החודש</div>
         <div class="big" id="month-total"></div>
+        <div class="net-grid">
+          <div><div class="muted">הכנסות</div><div class="net-num" id="month-income"></div></div>
+          <div><div class="muted">נטו</div><div class="net-num" id="month-net"></div></div>
+        </div>
+      </div>
+      <div class="card hidden" id="income-card">
+        <h2>הכנסות</h2>
+        <ul class="items flat" id="income-list"></ul>
       </div>
       <div class="card">
         <ul class="cat-list" id="cat-list"></ul>

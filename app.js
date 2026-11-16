@@ -29,6 +29,15 @@ const PAYMENTS = [
 // check ו-fixed לא מופיעים ככפתורים: הם רק להוצאות קבועות (למשל השכירות בצ'קים)
 const PAY_NAME = { ...Object.fromEntries(PAYMENTS.map(p => [p.id, p.name])), fixed: 'קבוע', check: "צ'ק" };
 
+const INCOME_SOURCES = [
+  { id: 'unemployment', name: 'אבטלה',  icon: '🏛️' },
+  { id: 'elections',    name: 'בחירות', icon: '🗳️' },
+  { id: 'salary',       name: 'משכורת', icon: '💼' },
+  { id: 'other',        name: 'אחר',    icon: '➕' },
+];
+const SRC = Object.fromEntries(INCOME_SOURCES.map(s => [s.id, s]));
+const TABLES = ['expenses', 'incomes', 'settlements'];   // טבלאות שמסתנכרנות שורה-שורה
+
 const FIRST_MONTH = '2026-11';   // החודש הראשון באפליקציה
 const MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 
@@ -85,6 +94,7 @@ let db = readJSON(STORE_KEY, null) || {
   queue: [],   // [{ table, id, v }] שינויים שעוד לא עלו לענן
 };
 db.settings = { ...JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), ...db.settings };
+db.incomes = db.incomes || {};
 const prefs = readJSON(PREFS_KEY, { lastPayment: 'max', skipLogin: false });
 
 const persist = () => writeJSON(STORE_KEY, db);
@@ -99,6 +109,11 @@ function putExpense(row) {
   db.expenses[row.id] = row;
   enqueue('expenses', row.id, row.updated_at);
 }
+function putIncome(row) {
+  row.updated_at = new Date().toISOString();
+  db.incomes[row.id] = row;
+  enqueue('incomes', row.id, row.updated_at);
+}
 function putSettlement(row) {
   row.updated_at = new Date().toISOString();
   db.settlements[row.id] = row;
@@ -111,6 +126,7 @@ function putSettings() {
 
 const liveExpenses = () => Object.values(db.expenses).filter(e => !e.deleted);
 const monthExpenses = ym => liveExpenses().filter(e => monthOf(e.date) === ym);
+const monthIncomes = ym => Object.values(db.incomes).filter(i => !i.deleted && monthOf(i.date) === ym);
 function partnerBalance() {
   const owed = liveExpenses().filter(e => e.shared).reduce((s, e) => s + (e.amount - e.my_share), 0);
   const paid = Object.values(db.settlements).filter(s => !s.deleted).reduce((s, x) => s + x.amount, 0);
@@ -188,7 +204,7 @@ async function sync() {
     const batch = [...db.queue];
 
     // 1. מעלים שינויים מקומיים
-    for (const table of ['expenses', 'settlements']) {
+    for (const table of TABLES) {
       const rows = batch.filter(q => q.table === table).map(q => db[table][q.id]).filter(Boolean)
         .map(r => ({ ...r, user_id }));
       if (rows.length) {
@@ -203,7 +219,7 @@ async function sync() {
     db.queue = db.queue.filter(q => !batch.some(b => b.table === q.table && b.id === q.id && b.v === q.v));
 
     // 2. מורידים הכל מהענן (שומרים על מה שעוד ממתין להעלאה)
-    for (const table of ['expenses', 'settlements']) {
+    for (const table of TABLES) {
       const remote = await fetchAll(table);
       const next = {};
       for (const r of remote) {
@@ -239,10 +255,11 @@ async function sync() {
 
 /* ================= מסך רישום ================= */
 
-const form = { editId: null, amount: '', category: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' };
+// kind: 'expense' | 'income'
+const form = { kind: 'expense', editId: null, amount: '', category: null, source: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' };
 
 function resetForm() {
-  Object.assign(form, { editId: null, amount: '', category: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' });
+  Object.assign(form, { kind: 'expense', editId: null, amount: '', category: null, source: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' });
   $('note-input').value = '';
   $('note-input').classList.add('hidden');
 }
@@ -259,7 +276,16 @@ function buildAddView() {
     `<button type="button" class="cat-btn" data-cat="${c.id}"><span class="ic">${c.icon}</span><span>${esc(c.short)}</span></button>`).join('');
   $('pay-row').innerHTML = PAYMENTS.map(p =>
     `<button type="button" class="pay-btn" data-pay="${p.id}">${esc(p.name)}</button>`).join('');
+  $('src-grid').innerHTML = INCOME_SOURCES.map(s =>
+    `<button type="button" class="src-btn" data-src="${s.id}"><span class="ic">${s.icon}</span><span>${esc(s.name)}</span></button>`).join('');
 
+  $('kind-toggle').addEventListener('click', e => {
+    const b = e.target.closest('[data-kind]');
+    if (!b || form.editId) return;   // בעריכה לא מחליפים סוג
+    form.kind = b.dataset.kind;
+    renderAdd();
+  });
+  $('src-grid').addEventListener('click', e => { const b = e.target.closest('.src-btn'); if (b) { form.source = b.dataset.src; renderAdd(); } });
   $('numpad').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pressKey(b.dataset.k); });
   $('cat-grid').addEventListener('click', e => { const b = e.target.closest('.cat-btn'); if (b) { form.category = b.dataset.cat; renderAdd(); } });
   $('pay-row').addEventListener('click', e => { const b = e.target.closest('.pay-btn'); if (b) { form.payment = b.dataset.pay; renderAdd(); } });
@@ -324,9 +350,46 @@ function renderAdd() {
   $('note-chip').classList.toggle('has-value', !!form.note.trim());
   $('note-chip').textContent = form.note.trim() ? 'הערה ✓' : 'הערה';
 
-  $('save-btn').disabled = !(amountValue() > 0 && form.category);
+  const income = form.kind === 'income';
+  document.querySelectorAll('#kind-toggle [data-kind]').forEach(b => b.classList.toggle('active', b.dataset.kind === form.kind));
+  $('kind-toggle').classList.toggle('hidden', !!form.editId);
+  $('cat-grid').classList.toggle('hidden', income);
+  $('pay-row').classList.toggle('hidden', income);
+  $('shared-chip').classList.toggle('hidden', income);
+  if (income) $('share-row').classList.add('hidden');
+  $('src-grid').classList.toggle('hidden', !income);
+  document.querySelectorAll('.src-btn').forEach(b => b.classList.toggle('active', b.dataset.src === form.source));
+
+  $('save-btn').disabled = !(amountValue() > 0 && (income ? form.source : form.category));
   $('save-btn').textContent = form.editId ? 'עדכון' : 'שמירה';
+  $('edit-bar').querySelector('span').textContent = income ? 'עריכת הכנסה' : 'עריכת הוצאה';
   $('edit-bar').classList.toggle('hidden', !form.editId);
+}
+
+function startEditIncome(id) {
+  const inc = db.incomes[id];
+  if (!inc) return;
+  Object.assign(form, {
+    kind: 'income', editId: id, amount: String(inc.amount), source: inc.source,
+    shared: false, date: inc.date, note: inc.note || '',
+  });
+  $('note-input').value = form.note;
+  $('note-input').classList.toggle('hidden', !form.note);
+  showView('add');
+}
+
+function saveIncome() {
+  const amount = round2(amountValue());
+  if (!(amount > 0) || !form.source) return;
+  const fields = { date: form.date, amount, source: form.source, note: form.note.trim() || null };
+  const editing = !!form.editId;
+  if (editing) putIncome({ ...db.incomes[form.editId], ...fields });
+  else putIncome({ id: uid(), ...fields, deleted: false });
+  persist();
+  toast(`${editing ? 'עודכן' : 'נשמרה הכנסה'}: ${money(amount)} מ${SRC[form.source].name}`);
+  if (editing) { viewMonth = monthOf(form.date); resetForm(); showView('month'); }
+  else { resetForm(); render(); }
+  sync();
 }
 
 // עריכה: טוענים הוצאה קיימת לתוך מסך הרישום
@@ -349,6 +412,7 @@ function startEdit(id) {
 }
 
 function saveExpense() {
+  if (form.kind === 'income') return saveIncome();
   const amount = round2(amountValue());
   if (!(amount > 0) || !form.category) return;
   const share = round2(myShare());
@@ -395,7 +459,28 @@ function renderMonth() {
   $('month-title').textContent = monthTitle(ym);
   $('month-next').disabled = ym >= monthOf(todayStr());
   const items = monthExpenses(ym);
-  $('month-total').textContent = money(items.reduce((s, e) => s + e.my_share, 0));
+  const spent = items.reduce((s, e) => s + e.my_share, 0);
+  $('month-total').textContent = money(spent);
+
+  // הכנסות ונטו
+  const incomes = monthIncomes(ym).sort((a, b) => b.date.localeCompare(a.date));
+  const earned = incomes.reduce((s, i) => s + i.amount, 0);
+  const net = round2(earned - spent);
+  $('month-income').textContent = money(earned);
+  $('month-net').textContent = (net > 0 ? '+' : net < 0 ? '−' : '') + money(Math.abs(net));
+  $('month-net').classList.toggle('pos', net > 0);
+  $('month-net').classList.toggle('neg', net < 0);
+  $('income-card').classList.toggle('hidden', !incomes.length);
+  $('income-list').innerHTML = incomes.map(i => `
+    <li>
+      <span class="ic">${SRC[i.source]?.icon || '➕'}</span>
+      <div class="i-main">
+        <div><span class="i-amt">${money(i.amount)}</span> · ${esc(SRC[i.source]?.name || i.source)}</div>
+        <div class="i-sub">${dateLabel(i.date)}${i.note ? ' · ' + esc(i.note) : ''}</div>
+      </div>
+      <button type="button" class="edit-btn" data-edit-income="${esc(i.id)}" aria-label="עריכה">✎</button>
+      <button type="button" class="del-btn" data-del-income="${esc(i.id)}" aria-label="מחיקה">✕</button>
+    </li>`).join('');
 
   const byCat = {};
   for (const e of items) (byCat[e.category] ||= []).push(e);
@@ -440,6 +525,16 @@ function renderMonth() {
 function buildMonthView() {
   $('month-prev').addEventListener('click', () => { viewMonth = shiftMonth(viewMonth, -1); renderMonth(); });
   $('month-next').addEventListener('click', () => { viewMonth = shiftMonth(viewMonth, 1); renderMonth(); });
+  $('income-list').addEventListener('click', e => {
+    const edit = e.target.closest('[data-edit-income]');
+    if (edit) { startEditIncome(edit.dataset.editIncome); return; }
+    const del = e.target.closest('[data-del-income]');
+    if (!del) return;
+    const inc = db.incomes[del.dataset.delIncome];
+    if (inc && confirm(`למחוק הכנסה של ${money(inc.amount)} מ${SRC[inc.source]?.name || ''}?`)) {
+      putIncome({ ...inc, deleted: true }); persist(); render(); sync();
+    }
+  });
   $('cat-list').addEventListener('click', e => {
     const edit = e.target.closest('[data-edit]');
     if (edit) { startEdit(edit.dataset.edit); return; }
