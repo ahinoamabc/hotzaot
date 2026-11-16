@@ -1,6 +1,6 @@
 // עבודה בלי חיבור: שומרים את קבצי האפליקציה במכשיר.
 // בכל עדכון של האפליקציה מעלים את המספר, כדי שהטלפון ימשוך את הגרסה החדשה.
-const CACHE = 'hotzaot-v3';
+const CACHE = 'hotzaot-v4';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png'];
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@';
 

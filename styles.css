@@ -147,7 +147,14 @@ h2 { font-size: 17px; margin: 0 0 8px; }
 .items .i-main { flex: 1; min-width: 0; }
 .items .i-sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .items .i-amt { font-variant-numeric: tabular-nums; }
-.del-btn { width: 30px; height: 30px; border-radius: 999px; color: var(--muted); font-size: 16px; }
+.del-btn, .edit-btn { width: 32px; height: 32px; border-radius: 999px; color: var(--muted); font-size: 16px; }
+.edit-btn { color: var(--accent); }
+.edit-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; border-radius: 12px;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700;
+}
+.edit-bar button { color: var(--accent); font-weight: 600; text-decoration: underline; }
 .empty-state { color: var(--muted); text-align: center; padding: 8px 0; }
 
 .bank-grid { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin-top: 8px; font-variant-numeric: tabular-nums; }

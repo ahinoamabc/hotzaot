@@ -239,10 +239,10 @@ async function sync() {
 
 /* ================= מסך רישום ================= */
 
-const form = { amount: '', category: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' };
+const form = { editId: null, amount: '', category: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' };
 
 function resetForm() {
-  Object.assign(form, { amount: '', category: null, shared: false, split: 3, customShare: null, date: todayStr(), note: '' });
+  Object.assign(form, { editId: null, amount: '', category: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' });
   $('note-input').value = '';
   $('note-input').classList.add('hidden');
 }
@@ -277,6 +277,7 @@ function buildAddView() {
   $('note-chip').addEventListener('click', () => { const n = $('note-input'); n.classList.toggle('hidden'); if (!n.classList.contains('hidden')) n.focus(); });
   $('note-input').addEventListener('input', e => { form.note = e.target.value; renderAdd(); });
   $('save-btn').addEventListener('click', saveExpense);
+  $('edit-cancel').addEventListener('click', () => { resetForm(); showView('month'); });
 
   // מקלדת פיזית במחשב
   document.addEventListener('keydown', e => {
@@ -324,16 +325,50 @@ function renderAdd() {
   $('note-chip').textContent = form.note.trim() ? 'הערה ✓' : 'הערה';
 
   $('save-btn').disabled = !(amountValue() > 0 && form.category);
+  $('save-btn').textContent = form.editId ? 'עדכון' : 'שמירה';
+  $('edit-bar').classList.toggle('hidden', !form.editId);
+}
+
+// עריכה: טוענים הוצאה קיימת לתוך מסך הרישום
+function startEdit(id) {
+  const ex = db.expenses[id];
+  if (!ex) return;
+  let split = 3, customShare = null;
+  if (ex.shared) {
+    if (Math.abs(ex.my_share - round2(ex.amount / 3)) < 0.01) split = 3;
+    else if (Math.abs(ex.my_share - round2(ex.amount / 2)) < 0.01) split = 2;
+    else { split = 'custom'; customShare = ex.my_share; }
+  }
+  Object.assign(form, {
+    editId: id, amount: String(ex.amount), category: ex.category, payment: ex.payment,
+    shared: !!ex.shared, split, customShare, date: ex.date, note: ex.note || '',
+  });
+  $('note-input').value = form.note;
+  $('note-input').classList.toggle('hidden', !form.note);
+  showView('add');
 }
 
 function saveExpense() {
   const amount = round2(amountValue());
   if (!(amount > 0) || !form.category) return;
   const share = round2(myShare());
-  putExpense({
-    id: uid(), date: form.date, amount, my_share: share, category: form.category,
-    payment: form.payment, shared: form.shared, note: form.note.trim() || null, source: 'manual', deleted: false,
-  });
+  const fields = {
+    date: form.date, amount, my_share: share, category: form.category,
+    payment: form.payment, shared: form.shared, note: form.note.trim() || null,
+  };
+
+  if (form.editId) {
+    putExpense({ ...db.expenses[form.editId], ...fields });
+    persist();
+    toast(`עודכן: ${money(share)} ב${CAT[form.category].name}`);
+    viewMonth = monthOf(form.date);
+    resetForm();
+    showView('month');
+    sync();
+    return;
+  }
+
+  putExpense({ id: uid(), ...fields, source: 'manual', deleted: false });
   prefs.lastPayment = form.payment; savePrefs();
   persist();
 
@@ -383,6 +418,7 @@ function renderMonth() {
             <div><span class="i-amt">${money(e.my_share)}</span>${e.shared ? ` <span class="muted">(מתוך ${money(e.amount)})</span>` : ''}</div>
             <div class="i-sub">${dateLabel(e.date)} · ${esc(PAY_NAME[e.payment] || e.payment)}${e.shared ? ' · משותף' : ''}${e.note ? ' · ' + esc(e.note) : ''}</div>
           </div>
+          <button type="button" class="edit-btn" data-edit="${esc(e.id)}" aria-label="עריכה">✎</button>
           <button type="button" class="del-btn" data-del="${esc(e.id)}" aria-label="מחיקה">✕</button>
         </li>`).join('')}</ul>` : '';
     return `<li><button type="button" class="cat-row" data-open="${c.id}">
@@ -405,6 +441,8 @@ function buildMonthView() {
   $('month-prev').addEventListener('click', () => { viewMonth = shiftMonth(viewMonth, -1); renderMonth(); });
   $('month-next').addEventListener('click', () => { viewMonth = shiftMonth(viewMonth, 1); renderMonth(); });
   $('cat-list').addEventListener('click', e => {
+    const edit = e.target.closest('[data-edit]');
+    if (edit) { startEdit(edit.dataset.edit); return; }
     const del = e.target.closest('[data-del]');
     if (del) {
       const ex = db.expenses[del.dataset.del];
@@ -629,6 +667,7 @@ function start() {
   $('tabbar').addEventListener('click', e => {
     const b = e.target.closest('[data-view]');
     if (!b) return;
+    if (form.editId) resetForm();   // יציאה מעריכה בלי לשמור
     if (b.dataset.view === 'month') viewMonth = monthOf(todayStr());
     showView(b.dataset.view);
   });
