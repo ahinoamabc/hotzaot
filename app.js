@@ -446,6 +446,7 @@ function renderSync() {
 
 function renderSettings() {
   renderSync();
+  renderPush();
   const b = db.settings.bank || {};
   if (document.activeElement?.closest('#bank-form') == null) {
     $('set-balance').value = b.balance ?? '';
@@ -483,6 +484,93 @@ function buildSettingsView() {
     putSettings(); persist(); document.activeElement?.blur(); render(); sync();
     toast('הקבועות עודכנו מהחודש הבא');
   });
+}
+
+/* ================= התראות (תזכורת ערב) ================= */
+
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
+function b64uToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+}
+function swReady(ms = 4000) {
+  return Promise.race([navigator.serviceWorker.ready, new Promise((_, rej) => setTimeout(() => rej(new Error('sw timeout')), ms))]);
+}
+async function currentPushSub() {
+  try { return await (await swReady()).pushManager.getSubscription(); } catch (e) { return null; }
+}
+
+async function renderPush() {
+  const show = (id, on) => $(id).classList.toggle('hidden', !on);
+  let text, enable = false, active = false;
+  if (!pushSupported()) {
+    text = isIOS() ? 'כדי לקבל התראות צריך לפתוח את האפליקציה מהאייקון במסך הבית, לא מספארי.' : 'הדפדפן הזה לא תומך בהתראות.';
+  } else if (!session) {
+    text = 'צריך להתחבר כדי להפעיל התראות.';
+  } else if (Notification.permission === 'denied') {
+    text = 'ההתראות חסומות. אפשר לאשר אותן בהגדרות של האייפון ← עדכונים ← הוצאות.';
+  } else if (await currentPushSub()) {
+    text = 'פועל: כל ערב ב-21:00 תגיע תזכורת.'; active = true;
+  } else {
+    text = 'כבוי.'; enable = true;
+  }
+  $('push-detail').textContent = text;
+  show('push-btn', enable); show('push-test-btn', active); show('push-off-btn', active);
+}
+
+async function enablePush() {
+  try {
+    const perm = await Notification.requestPermission();   // חייב לקרות ישר מהלחיצה
+    if (perm !== 'granted') { toast('ההתראות לא אושרו'); return renderPush(); }
+    const reg = await swReady();
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(window.APP_CONFIG.vapidPublicKey) });
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subscriptions')
+      .upsert({ endpoint: j.endpoint, user_id: session.user.id, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: 'endpoint' });
+    if (error) throw error;
+    toast('ההתראות הופעלו');
+  } catch (e) {
+    console.error(e);
+    toast('לא הצלחתי להפעיל: ' + (e.message || e));
+  }
+  renderPush();
+}
+
+async function disablePush() {
+  const sub = await currentPushSub();
+  if (sub) {
+    await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+    await sub.unsubscribe();
+  }
+  toast('ההתראות כובו');
+  renderPush();
+}
+
+async function testPush() {
+  try {
+    const { data } = await sb.auth.getSession();
+    const res = await fetch(`${window.APP_CONFIG.supabaseUrl}/functions/v1/daily-reminder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: window.APP_CONFIG.supabaseAnonKey, Authorization: `Bearer ${data.session.access_token}` },
+      body: JSON.stringify({ test: true }),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error || res.status);
+    const bad = (out.results || []).filter(r => r.status >= 300);
+    if (!out.sent) toast('לא נמצא מכשיר רשום');
+    else if (bad.length) toast(`השליחה נכשלה (${bad[0].status}) ${bad[0].detail || ''}`);
+    else toast('נשלחה. ההתראה תגיע בעוד כמה שניות');
+  } catch (e) {
+    toast('השליחה נכשלה: ' + (e.message || e));
+  }
+}
+
+function buildPushView() {
+  $('push-btn').addEventListener('click', enablePush);
+  $('push-off-btn').addEventListener('click', disablePush);
+  $('push-test-btn').addEventListener('click', testPush);
 }
 
 /* ================= התחברות ================= */
@@ -536,7 +624,7 @@ function toast(msg) {
 /* ================= הפעלה ================= */
 
 function start() {
-  buildAddView(); buildMonthView(); buildSettingsView(); buildLoginView();
+  buildAddView(); buildMonthView(); buildSettingsView(); buildPushView(); buildLoginView();
   $('tabbar').addEventListener('click', e => {
     const b = e.target.closest('[data-view]');
     if (!b) return;

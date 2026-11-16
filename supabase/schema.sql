@@ -49,3 +49,32 @@ drop policy if exists own_rows on settings;
 create policy own_rows on expenses    for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy own_rows on settlements for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy own_rows on settings    for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------- תזכורת ערב (התראות Push) ----------
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+-- הטלפונים שנרשמו להתראות
+create table if not exists push_subscriptions (
+  endpoint   text primary key,
+  user_id    uuid not null default auth.uid() references auth.users on delete cascade,
+  p256dh     text not null,
+  auth       text not null,
+  created_at timestamptz not null default now()
+);
+alter table push_subscriptions enable row level security;
+create policy own_rows on push_subscriptions for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+
+-- סודות של השרת: vapid_public, vapid_private_jwk, cron_secret, reminder_hour.
+-- רק ה-service role קורא אותם. הערכים עצמם לא נמצאים בקובץ הזה.
+create table if not exists push_config (key text primary key, value text not null);
+alter table push_config enable row level security;
+revoke all on push_config from anon, authenticated;
+
+-- כל יום ב-18:00 וב-19:00 UTC; הפונקציה שולחת רק כשבירושלים 21:00 (קיץ וחורף)
+-- select cron.schedule('daily-reminder', '0 18,19 * * *', $$ select net.http_post(
+--   url := 'https://czxvgptljyxkeafucvco.supabase.co/functions/v1/daily-reminder',
+--   headers := jsonb_build_object('Content-Type','application/json',
+--     'x-cron-secret', (select value from public.push_config where key = 'cron_secret')),
+--   body := '{}'::jsonb) $$);
