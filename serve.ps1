@@ -10,6 +10,7 @@ Write-Host "Serving $root on http://localhost:$Port/"
 try {
   while ($listener.IsListening) {
     $ctx = $listener.GetContext()
+    try {
     $path = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
     if ($path -eq '') { $path = 'index.html' }
     $file = [IO.Path]::GetFullPath((Join-Path $root $path))
@@ -23,5 +24,6 @@ try {
       $res.OutputStream.Write($bytes, 0, $bytes.Length)
     } else { $res.StatusCode = 404 }
     $res.Close()
+    } catch { }   # the browser dropped the connection midway; move on to the next request
   }
 } finally { $listener.Stop() }

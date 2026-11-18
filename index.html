@@ -28,12 +28,15 @@
         <button type="button" data-kind="income">הכנסה</button>
       </div>
       <div class="chips-row">
-        <label class="chip" id="date-chip">
-          <span id="date-label">היום</span>
-          <input type="date" id="date-input" aria-label="תאריך">
-        </label>
+        <button class="chip" id="date-chip" type="button" aria-expanded="false"><span id="date-label">היום</span></button>
         <button class="chip" id="note-chip" type="button">הערה</button>
         <button class="chip toggle" id="shared-chip" type="button" aria-pressed="false">משותף</button>
+      </div>
+      <div class="date-row hidden" id="date-row">
+        <button type="button" class="date-opt" data-days="0">היום</button>
+        <button type="button" class="date-opt" data-days="1">אתמול</button>
+        <button type="button" class="date-opt" data-days="2">שלשום</button>
+        <label class="date-opt date-other" id="date-other"><span>תאריך אחר</span><input type="date" id="date-input" aria-label="תאריך אחר"></label>
       </div>
       <input id="note-input" class="note-input hidden" type="text" placeholder="הערה (לא חובה)" maxlength="120">
 

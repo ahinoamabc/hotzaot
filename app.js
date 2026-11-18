@@ -78,11 +78,14 @@ function uid() {
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function readJSON(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } }
 function writeJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* אין אחסון — ממשיכים בזיכרון */ } }
+function daysAgo(n) {
+  const d = new Date(); d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 function dateLabel(d) {
-  const t = todayStr();
-  if (d === t) return 'היום';
-  const y = new Date(); y.setDate(y.getDate() - 1);
-  if (d === `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`) return 'אתמול';
+  if (d === daysAgo(0)) return 'היום';
+  if (d === daysAgo(1)) return 'אתמול';
+  if (d === daysAgo(2)) return 'שלשום';
   return `${Number(d.slice(8))}.${Number(d.slice(5, 7))}`;
 }
 
@@ -262,6 +265,7 @@ function resetForm() {
   Object.assign(form, { kind: 'expense', editId: null, amount: '', category: null, source: null, payment: prefs.lastPayment || 'max', shared: false, split: 3, customShare: null, date: todayStr(), note: '' });
   $('note-input').value = '';
   $('note-input').classList.add('hidden');
+  $('date-row').classList.add('hidden');
 }
 const amountValue = () => parseNum(form.amount) || 0;
 function myShare() {
@@ -299,7 +303,24 @@ function buildAddView() {
     } else { form.split = Number(b.dataset.split); form.customShare = null; }
     renderAdd();
   });
-  $('date-input').addEventListener('change', e => { if (e.target.value) { form.date = e.target.value; renderAdd(); } });
+  // תאריך: קיצורים, ורק "תאריך אחר" פותח את הבוחר של המכשיר
+  $('date-chip').addEventListener('click', () => { $('date-row').classList.toggle('hidden'); renderAdd(); });
+  $('date-row').addEventListener('click', e => {
+    const b = e.target.closest('[data-days]');
+    if (!b) return;
+    form.date = daysAgo(Number(b.dataset.days));
+    $('date-row').classList.add('hidden');
+    renderAdd();
+  });
+  const onPick = e => {
+    if (!e.target.value) return;
+    form.date = e.target.value;
+    e.target.blur();   // משחררים את הבוחר של iOS, אחרת הלחיצה הבאה לא נקלטת
+    $('date-row').classList.add('hidden');
+    renderAdd();
+  };
+  $('date-input').addEventListener('change', onPick);
+  $('date-input').addEventListener('input', onPick);
   $('note-chip').addEventListener('click', () => { const n = $('note-input'); n.classList.toggle('hidden'); if (!n.classList.contains('hidden')) n.focus(); });
   $('note-input').addEventListener('input', e => { form.note = e.target.value; renderAdd(); });
   $('save-btn').addEventListener('click', saveExpense);
@@ -346,7 +367,11 @@ function renderAdd() {
   }
   $('date-label').textContent = dateLabel(form.date);
   $('date-chip').classList.toggle('has-value', form.date !== todayStr());
-  $('date-input').value = form.date;
+  $('date-chip').setAttribute('aria-expanded', String(!$('date-row').classList.contains('hidden')));
+  const quick = [0, 1, 2].find(n => daysAgo(n) === form.date);
+  document.querySelectorAll('.date-opt[data-days]').forEach(b => b.classList.toggle('active', Number(b.dataset.days) === quick));
+  $('date-other').classList.toggle('active', quick === undefined);
+  if (document.activeElement !== $('date-input')) $('date-input').value = form.date;
   $('note-chip').classList.toggle('has-value', !!form.note.trim());
   $('note-chip').textContent = form.note.trim() ? 'הערה ✓' : 'הערה';
 
