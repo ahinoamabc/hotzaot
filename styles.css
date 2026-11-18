@@ -124,7 +124,10 @@ h2 { font-size: 17px; margin: 0 0 8px; }
   background: var(--accent); color: var(--accent-text);
   font-size: 18px; font-weight: 700;
 }
-.save-btn:disabled { opacity: 0.35; cursor: default; }
+.save-btn.incomplete { opacity: 0.45; }
+/* סימון של מה שחסר כשלוחצים שמירה */
+.need { animation: need 0.4s ease 2; border-radius: 14px; outline: 2px solid var(--warn); outline-offset: 3px; }
+@keyframes need { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
 /* ---------- החודש ---------- */
 .month-nav { display: flex; align-items: center; justify-content: space-between; }

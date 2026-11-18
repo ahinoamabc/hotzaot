@@ -385,10 +385,31 @@ function renderAdd() {
   $('src-grid').classList.toggle('hidden', !income);
   document.querySelectorAll('.src-btn').forEach(b => b.classList.toggle('active', b.dataset.src === form.source));
 
-  $('save-btn').disabled = !(amountValue() > 0 && (income ? form.source : form.category));
+  $('save-btn').classList.toggle('incomplete', missingFields().length > 0);
   $('save-btn').textContent = form.editId ? 'עדכון' : 'שמירה';
   $('edit-bar').querySelector('span').textContent = income ? 'עריכת הכנסה' : 'עריכת הוצאה';
   $('edit-bar').classList.toggle('hidden', !form.editId);
+}
+
+// מה חסר כדי לשמור: [{ name, el }]
+function missingFields() {
+  const out = [];
+  if (!(amountValue() > 0)) out.push({ name: 'סכום', el: 'amount-display' });
+  if (form.kind === 'income') { if (!form.source) out.push({ name: 'מקור', el: 'src-grid' }); }
+  else if (!form.category) out.push({ name: 'קטגוריה', el: 'cat-grid' });
+  return out;
+}
+// השמירה תמיד לחיצה; אם חסר משהו, אומרים מה ומסמנים אותו
+function checkComplete() {
+  const miss = missingFields();
+  if (!miss.length) return true;
+  toast('חסר: ' + miss.map(m => m.name).join(' ו'));
+  for (const m of miss) {
+    const el = $(m.el);
+    el.classList.remove('need'); void el.offsetWidth; el.classList.add('need');
+    setTimeout(() => el.classList.remove('need'), 1600);
+  }
+  return false;
 }
 
 function startEditIncome(id) {
@@ -405,7 +426,7 @@ function startEditIncome(id) {
 
 function saveIncome() {
   const amount = round2(amountValue());
-  if (!(amount > 0) || !form.source) return;
+  if (!checkComplete()) return;
   const fields = { date: form.date, amount, source: form.source, note: form.note.trim() || null };
   const editing = !!form.editId;
   if (editing) putIncome({ ...db.incomes[form.editId], ...fields });
@@ -439,7 +460,7 @@ function startEdit(id) {
 function saveExpense() {
   if (form.kind === 'income') return saveIncome();
   const amount = round2(amountValue());
-  if (!(amount > 0) || !form.category) return;
+  if (!checkComplete()) return;
   const share = round2(myShare());
   const fields = {
     date: form.date, amount, my_share: share, category: form.category,
